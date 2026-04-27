@@ -1,0 +1,463 @@
+!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Community Data Hub</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- PWA Meta -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#4F46E5">
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <!-- Material Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <!-- Offline Banner -->
+    <div id="offline-banner" class="hidden"
+        style="background:var(--urgent-high); color:white; text-align:center; padding:0.5rem; font-size:0.875rem; font-weight:500; position:fixed; top:0; left:0; width:100%; z-index:9999; display:flex; justify-content:center; align-items:center; gap:0.5rem;">
+        <span class="material-icons-round" style="font-size:1.25rem;">wifi_off</span>
+        <span data-i18n="offlineMode">Offline Mode. Working locally.</span>
+    </div>
+
+    <!-- 1. Login / Welcome Screen -->
+    <section id="login-screen" class="screen flex-center">
+        <div class="glass-card login-card text-center">
+            <div class="logo-container">
+                <span class="material-icons-round logo-icon">hub</span>
+            </div>
+            <h1 class="gradient-text" data-i18n="appName">Community Data Hub</h1>
+            <p class="tagline" data-i18n="tagline">Real-time needs. Hyperlocal action.</p>
+            <div class="login-actions">
+                <button class="btn btn-primary btn-large" onclick="app.login('ngo')">
+                    <span class="material-icons-round">domain</span> <span data-i18n="loginNgo">Login as NGO</span>
+                </button>
+                <button class="btn btn-secondary btn-large" onclick="app.login('volunteer')">
+                    <span class="material-icons-round">volunteer_activism</span> <span data-i18n="loginVol">Continue as
+                        Volunteer</span>
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- App Shell (Navigation) -->
+    <nav id="bottom-nav" class="hidden">
+        <button class="nav-item active" data-target="dashboard-screen" onclick="app.navigate('dashboard-screen')">
+            <span class="material-icons-round">dashboard</span> <span data-i18n="home">Home</span>
+        </button>
+        <button class="nav-item" data-target="map-screen" onclick="app.navigate('map-screen')">
+            <span class="material-icons-round">map</span> <span data-i18n="map">Map</span>
+        </button>
+        <button class="nav-item add-btn" data-target="add-screen" onclick="app.navigate('add-screen')">
+            <div class="add-icon-wrapper">
+                <span class="material-icons-round" style="font-size: 2rem;">add</span>
+            </div>
+        </button>
+        <button class="nav-item" data-target="surveys-screen" onclick="app.navigate('surveys-screen')">
+            <span class="material-icons-round">assignment</span> <span data-i18n="surveys">Surveys</span>
+        </button>
+        <button class="nav-item ngo-only hidden" data-target="ngo-panel" onclick="app.navigate('ngo-panel')">
+            <span class="material-icons-round">admin_panel_settings</span> <span data-i18n="tasks">Tasks</span>
+        </button>
+        <button class="nav-item" data-target="impact-screen" onclick="app.navigate('impact-screen')">
+            <span class="material-icons-round">insights</span> <span data-i18n="impact">Impact</span>
+        </button>
+    </nav>
+
+    <!-- Top Header -->
+    <header id="app-header" class="hidden">
+        <div class="header-content">
+            <div class="header-left">
+                <span class="material-icons-round logo-icon-small">hub</span>
+                <span class="header-title">Data Hub</span>
+            </div>
+            <div class="header-right">
+                <button class="icon-btn" onclick="app.toggleDarkMode()" aria-label="Toggle Dark Mode"
+                    title="Toggle Dark Mode">
+                    <span class="material-icons-round" id="dark-mode-icon">dark_mode</span>
+                </button>
+                <select id="lang-select" class="filter-select" onchange="app.changeLanguage(this.value)"
+                    aria-label="Select Language" style="padding:0.25rem 0.5rem; font-size:0.75rem;">
+                    <option value="en">English</option>
+                    <option value="hi">हिंदी (Hindi)</option>
+                    <option value="es">Español</option>
+                </select>
+                <span class="user-badge" id="user-badge">Role</span>
+                <button class="icon-btn" onclick="app.logout()" aria-label="Logout" title="Logout">
+                    <span class="material-icons-round">logout</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 2. Dashboard Screen -->
+    <section id="dashboard-screen" class="screen hidden app-content">
+        <div class="container">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon text-blue"><span class="material-icons-round">analytics</span></div>
+                    <h3 id="stat-total">0</h3>
+                    <p data-i18n="totalRequests">Total Requests</p>
+                </div>
+                <div class="stat-card urgent-glow">
+                    <div class="stat-icon text-red"><span class="material-icons-round">warning</span></div>
+                    <h3 id="stat-urgent" class="text-red">0</h3>
+                    <p data-i18n="highUrgency">High Urgency</p>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon text-green"><span class="material-icons-round">task_alt</span></div>
+                    <h3 id="stat-resolved" class="text-green">0</h3>
+                    <p data-i18n="resolvedCases">Resolved Cases</p>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="filters-bar">
+                <select id="filter-category" class="filter-select" onchange="app.renderDashboard()">
+                    <option value="All">All Categories</option>
+                    <option value="Health">Health</option>
+                    <option value="Food">Food</option>
+                    <option value="Education">Education</option>
+                    <option value="Shelter">Shelter</option>
+                </select>
+                <select id="filter-urgency" class="filter-select" onchange="app.renderDashboard()">
+                    <option value="All">All Urgency</option>
+                    <option value="High">High</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Low">Low</option>
+                </select>
+            </div>
+
+            <div id="urgent-highlights">
+                <!-- Highlights populated via JS -->
+            </div>
+
+            <h3 class="section-subtitle mt-4" data-i18n="recentRequests">Recent Requests</h3>
+            <div class="requests-list" id="dashboard-requests-list">
+                <!-- Cards populated via JS -->
+            </div>
+        </div>
+    </section>
+
+    <!-- 3. Map View Screen -->
+    <section id="map-screen" class="screen hidden app-content map-container">
+        <div id="map"></div>
+        <div class="map-overlay-filters glass-panel">
+            <div class="legend">
+                <div class="legend-item"><span class="dot bg-red"></span> <span data-i18n="high">High</span></div>
+                <div class="legend-item"><span class="dot bg-yellow"></span> <span data-i18n="medium">Medium</span>
+                </div>
+                <div class="legend-item"><span class="dot bg-green"></span> <span data-i18n="low">Low</span></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 4. Add Request Screen -->
+    <section id="add-screen" class="screen hidden app-content">
+        <div class="container">
+            <h2 class="section-title" id="add-screen-title" data-i18n="newRequest">New Request</h2>
+            <form id="add-request-form" class="glass-card form-card" onsubmit="app.submitRequest(event)">
+                <input type="hidden" id="is-custom-survey" value="false">
+                <div class="form-group" id="standard-category-group">
+                    <label data-i18n="category">Category</label>
+                    <select id="add-category" required>
+                        <option value="Health">Health</option>
+                        <option value="Food">Food</option>
+                        <option value="Education">Education</option>
+                        <option value="Shelter">Shelter</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+
+                <div id="dynamic-fields-container"></div>
+
+                <div class="form-group">
+                    <label data-i18n="description">Description</label>
+                    <textarea id="add-description" rows="3" placeholder="Brief details about the need..."
+                        required></textarea>
+                </div>
+                <div class="form-group">
+                    <label data-i18n="urgency">Urgency</label>
+                    <div class="radio-group">
+                        <label class="radio-card high-urgency">
+                            <input type="radio" name="add-urgency" value="High" required>
+                            <span data-i18n="high">High</span>
+                        </label>
+                        <label class="radio-card medium-urgency">
+                            <input type="radio" name="add-urgency" value="Medium">
+                            <span data-i18n="medium">Medium</span>
+                        </label>
+                        <label class="radio-card low-urgency">
+                            <input type="radio" name="add-urgency" value="Low">
+                            <span data-i18n="low">Low</span>
+                        </label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label data-i18n="location">Location</label>
+                    <div class="location-picker">
+                        <button type="button" class="btn btn-outline" onclick="app.getLocation()"><span
+                                class="material-icons-round">my_location</span> <span data-i18n="useCurrentLocation">Use
+                                Current Location</span></button>
+                        <p id="location-status" class="text-small text-muted mt-2">Waiting for location...</p>
+                        <input type="hidden" id="add-lat">
+                        <input type="hidden" id="add-lng">
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block mt-4" data-i18n="submitRequest">Submit
+                    Request</button>
+            </form>
+        </div>
+    </section>
+
+    <!-- 5. Surveys & Paper-to-Digital Screen -->
+    <section id="surveys-screen" class="screen hidden app-content">
+        <div class="container">
+            <h2 class="section-title" data-i18n="dataCollection">Data Collection</h2>
+
+            <h3 class="section-subtitle mt-4" data-i18n="paperToDigital">Paper-to-Digital Bridge</h3>
+            <div class="glass-card upload-zone text-center" onclick="document.getElementById('paper-upload').click()">
+                <input type="file" id="paper-upload" class="hidden" accept="image/*"
+                    onchange="app.simulatePaperScan(event)">
+                <span class="material-icons-round text-primary"
+                    style="font-size: 3rem; margin-bottom: 1rem;">document_scanner</span>
+                <h4 data-i18n="uploadPaperForm">Upload Paper Form</h4>
+                <p class="text-muted text-small mt-2" data-i18n="uploadPaperDesc">Take a photo of a physical survey to
+                    automatically digitize it.</p>
+
+                <div id="scan-loader" class="hidden mt-3">
+                    <div class="spinner"></div>
+                    <p class="text-small text-primary mt-2">Extracting data...</p>
+                </div>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; align-items:center;" class="mt-4">
+                <h3 class="section-subtitle" style="margin:0;" data-i18n="digitalSurveys">Digital Surveys</h3>
+                <button class="btn btn-outline" style="padding:0.25rem 0.75rem; font-size:0.875rem;"
+                    onclick="document.getElementById('custom-survey-modal').classList.remove('hidden')">+ New
+                    Template</button>
+            </div>
+            <div class="survey-list mt-3" id="survey-list-container">
+                <div class="glass-card survey-card" id="default-survey-1">
+                    <span class="material-icons-round text-blue">health_and_safety</span>
+                    <div class="survey-info" onclick="app.openForm('Health')" style="cursor:pointer; flex:1;">
+                        <h4>General Needs Assessment</h4>
+                        <p class="text-muted text-small">Standard form for community needs</p>
+                    </div>
+                    <button class="icon-btn ngo-only"
+                        onclick="document.getElementById('default-survey-1').remove(); event.stopPropagation();"
+                        style="color:var(--urgent-high); padding:0.5rem; background:rgba(239, 68, 68, 0.1); border-radius:50%;"><span
+                            class="material-icons-round">delete</span></button>
+                </div>
+                <div class="glass-card survey-card" id="default-survey-2">
+                    <span class="material-icons-round text-red">medical_services</span>
+                    <div class="survey-info" onclick="app.openForm('Health')" style="cursor:pointer; flex:1;">
+                        <h4>Health & Medical Survey</h4>
+                        <p class="text-muted text-small">Detailed health requirements</p>
+                    </div>
+                    <button class="icon-btn ngo-only"
+                        onclick="document.getElementById('default-survey-2').remove(); event.stopPropagation();"
+                        style="color:var(--urgent-high); padding:0.5rem; background:rgba(239, 68, 68, 0.1); border-radius:50%;"><span
+                            class="material-icons-round">delete</span></button>
+                </div>
+                <div class="glass-card survey-card" id="default-survey-3">
+                    <span class="material-icons-round text-yellow">school</span>
+                    <div class="survey-info" onclick="app.openForm('Education')" style="cursor:pointer; flex:1;">
+                        <h4>Education Resources Survey</h4>
+                        <p class="text-muted text-small">School and learning materials</p>
+                    </div>
+                    <button class="icon-btn ngo-only"
+                        onclick="document.getElementById('default-survey-3').remove(); event.stopPropagation();"
+                        style="color:var(--urgent-high); padding:0.5rem; background:rgba(239, 68, 68, 0.1); border-radius:50%;"><span
+                            class="material-icons-round">delete</span></button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 6. NGO Action Panel -->
+    <section id="ngo-panel" class="screen hidden app-content">
+        <div class="container">
+            <div class="tabs mb-4">
+                <button class="tab active" onclick="app.setNgoFilter('Pending', this)"
+                    data-i18n="pending">Pending</button>
+                <button class="tab" onclick="app.setNgoFilter('Resolved', this)" data-i18n="resolved">Resolved</button>
+                <button class="tab" onclick="app.setNgoFilter('Dataset', this)" data-i18n="sharedDataset">Shared
+                    Dataset</button>
+            </div>
+
+            <div class="requests-list mt-4" id="ngo-requests-list">
+                <!-- Cards populated via JS -->
+            </div>
+
+            <div id="ngo-dataset-view" class="hidden mt-4">
+                <div class="glass-panel"
+                    style="padding: 1rem; margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center;">
+                    <span class="text-muted text-small" data-i18n="datasetDesc">Real-time collaborative dataset</span>
+                    <button class="btn btn-outline" style="padding: 0.5rem 1rem;" onclick="app.downloadCSV()">
+                        <span class="material-icons-round text-small">download</span> <span
+                            data-i18n="downloadCsv">Download CSV</span>
+                    </button>
+                </div>
+                <div
+                    style="overflow-x:auto; background:white; border-radius:var(--radius-md); box-shadow:var(--shadow-sm);">
+                    <table class="dataset-table" id="dataset-table">
+                        <!-- Table populated via JS -->
+                    </table>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 7. Impact Screen -->
+    <section id="impact-screen" class="screen hidden app-content">
+        <div class="container">
+            <h2 class="section-title" data-i18n="ourImpact">Our Impact</h2>
+            <div class="impact-hero glass-card gradient-bg">
+                <h1><span id="impact-percentage">0</span>%</h1>
+                <p data-i18n="requestsResolved">Requests Resolved Successfully</p>
+                <div class="people-helped mt-2">
+                    <span class="material-icons-round">groups</span>
+                    <span id="impact-people">0</span> <span data-i18n="peopleHelped">Estimated People Helped</span>
+                </div>
+            </div>
+            <div class="charts-container mt-4">
+                <h3 class="section-subtitle" data-i18n="requestsByCategory">Requests by Category</h3>
+                <div class="simple-bar-chart" id="impact-chart">
+                    <!-- Populated via JS -->
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Details Modal -->
+    <div id="details-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modal-category">
+        <div class="modal-backdrop" onclick="app.closeModal()"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-badge-row">
+                    <span id="modal-category" class="req-title" style="font-size:1.25rem;">Category</span>
+                    <span id="modal-urgency" class="badge">Urgency</span>
+                </div>
+                <button class="icon-btn" onclick="app.closeModal()" aria-label="Close details"><span
+                        class="material-icons-round">close</span></button>
+            </div>
+            <div class="modal-body">
+                <p id="modal-desc" class="modal-description">Description text...</p>
+                <div class="mt-4">
+                    <span id="modal-status" class="badge outline">Status</span>
+                </div>
+                <p class="modal-meta mt-2 text-muted"><span class="material-icons-round text-small"
+                        aria-hidden="true">location_on</span> <span id="modal-location">Location</span></p>
+                <p class="modal-meta text-muted"><span class="material-icons-round text-small"
+                        aria-hidden="true">schedule</span> <span id="modal-time">Time</span></p>
+            </div>
+            <div class="modal-footer mt-4" id="modal-actions">
+                <!-- Actions populated via JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert Toast -->
+    <div id="alert-toast" class="toast hidden" role="alert" aria-live="assertive">
+        <span class="material-icons-round text-red" aria-hidden="true">warning</span>
+        <div class="toast-content">
+            <strong>Urgent Alert!</strong>
+            <p id="toast-message">High urgency cluster detected.</p>
+        </div>
+    </div>
+
+    <!-- Custom Survey Modal -->
+    <div id="custom-survey-modal" class="modal hidden" role="dialog" aria-modal="true"
+        aria-labelledby="custom-survey-modal-title">
+        <div class="modal-backdrop" onclick="app.closeCustomSurveyModal()"></div>
+        <div class="modal-content glass-card">
+            <div class="modal-header">
+                <h3 id="custom-survey-modal-title" data-i18n="createTemplate">Create Custom Survey</h3>
+                <button class="icon-btn" onclick="app.closeCustomSurveyModal()" aria-label="Close builder"><span
+                        class="material-icons-round">close</span></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label data-i18n="surveyTitle">Survey Title</label>
+                    <input type="text" id="custom-survey-title" placeholder="e.g. Flood Relief Assessment" required>
+                </div>
+
+                <hr style="border:0; border-top:1px solid #E2E8F0; margin:1.5rem 0;">
+
+                <h4 style="margin-bottom:0.5rem; color:var(--text-main);">Form Fields Builder</h4>
+                <div id="builder-fields-list"
+                    style="margin-bottom:1rem; display:flex; flex-direction:column; gap:0.5rem;">
+                    <!-- Added fields appear here -->
+                </div>
+
+                <div class="glass-panel"
+                    style="padding:1rem; border:1px solid var(--primary); background:rgba(79, 70, 229, 0.05);">
+                    <div class="form-group" style="margin-bottom:0.5rem;">
+                        <label>New Field Question / Name</label>
+                        <input type="text" id="builder-field-name" placeholder="e.g. Do you need water?">
+                    </div>
+                    <div class="form-group" style="margin-bottom:0.75rem;">
+                        <label>Field Type</label>
+                        <select id="builder-field-type"
+                            style="width:100%; padding:0.5rem; border-radius:8px; border:1px solid #E2E8F0; background:white;">
+                            <option value="text">Short Answer (Text)</option>
+                            <option value="textarea">Paragraph</option>
+                            <option value="number">Number</option>
+                            <option value="checkbox">Checklist (Yes/No)</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-outline btn-block" style="padding:0.5rem;"
+                        onclick="app.addFieldToBuilder()">+ Add Field to Survey</button>
+                </div>
+
+                <button class="btn btn-primary btn-block mt-4" onclick="app.saveCustomSurvey()"
+                    data-i18n="createTemplateBtn">Save & Create Template</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loud Alert Modal (Screen Takeover) -->
+    <div id="loud-alert-modal" class="modal hidden" style="background: rgba(239, 68, 68, 0.95); z-index: 1000;"
+        role="alertdialog" aria-modal="true" aria-labelledby="loud-alert-title" aria-live="assertive">
+        <div class="modal-content text-center" style="border: 4px solid white; background: #FEF2F2;">
+            <span class="material-icons-round text-red" style="font-size: 4rem; margin-bottom: 1rem;"
+                aria-hidden="true">campaign</span>
+            <h2 id="loud-alert-title" class="text-red"
+                style="font-size: 2rem; margin-bottom: 1rem; text-transform: uppercase; font-weight: 800;"
+                data-i18n="criticalAlert">CRITICAL ALERT</h2>
+            <p id="loud-alert-msg" style="font-size: 1.25rem; font-weight: 500; margin-bottom: 2rem;">A new High Urgency
+                case has been reported.</p>
+            <button class="btn btn-primary btn-large"
+                style="background: var(--urgent-high); box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);"
+                onclick="document.getElementById('loud-alert-modal').classList.add('hidden'); app.navigate('dashboard-screen');"
+                data-i18n="acknowledgeView">Acknowledge & View</button>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="app.js"></script>
+    <script>
+        // Register Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(registration => console.log('SW registered:', registration.scope))
+                    .catch(error => console.log('SW registration failed:', error));
+            });
+        }
+    </script>
+</body>
+
+</html>
